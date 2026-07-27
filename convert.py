@@ -238,7 +238,8 @@ def run_kpf_generation(image_dir: str, kpf_path: str, title: str = "",
                        language: str = "ja", virtual_panels: str = "off",
                        facing_pages: bool = False,
                        facing_start: str = "single",
-                       gamma: float = DEFAULT_GAMMA) -> None:
+                       gamma: float = DEFAULT_GAMMA,
+                       gamma_skip_first_last: bool = False) -> None:
     """Generate KPF from images using the custom KPF generator."""
     image_paths = sorted([
         os.path.join(image_dir, f) for f in os.listdir(image_dir)
@@ -257,6 +258,7 @@ def run_kpf_generation(image_dir: str, kpf_path: str, title: str = "",
         facing_pages=facing_pages,
         facing_start=facing_start,
         gamma=gamma,
+        gamma_skip_first_last=gamma_skip_first_last,
     )
 
 
@@ -325,7 +327,8 @@ def convert_to_kfx(input_path: str, output_dir: str,
                    virtual_panels: str = "off",
                    facing_pages: bool = False,
                    facing_start: str = "single",
-                   gamma: float = DEFAULT_GAMMA) -> None:
+                   gamma: float = DEFAULT_GAMMA,
+                   gamma_skip_first_last: bool = False) -> None:
     """
     Full pipeline: EPUB/MOBI -> extract images -> KPF -> KFX.
 
@@ -337,6 +340,7 @@ def convert_to_kfx(input_path: str, output_dir: str,
         facing_pages: Enable facing pages (spreads) for landscape viewing.
         facing_start: "single" (default) keeps page 1 solo, "double" pairs from page 1.
         gamma: Display-gamma compensation for Kindle e-ink; 1.0 disables.
+        gamma_skip_first_last: Leave the first and last page uncorrected.
     """
     input_name = Path(input_path).stem
     kfx_output = os.path.join(output_dir, f"{input_name}.kfx")
@@ -371,14 +375,16 @@ def convert_to_kfx(input_path: str, output_dir: str,
         kpf_path = os.path.join(tmp_dir, f"{input_name}.kpf")
         print(f"\n[2/3] Generating KPF...")
         if gamma and abs(gamma - 1.0) > 1e-3:
-            print(f"    Gamma correction: {gamma}")
+            scope = " (pages 2..n-1)" if gamma_skip_first_last else ""
+            print(f"    Gamma correction: {gamma}{scope}")
         run_kpf_generation(image_dir, kpf_path,
                            title=metadata["title"], author=metadata["author"],
                            reading_direction=reading_direction,
                            virtual_panels=virtual_panels,
                            facing_pages=facing_pages,
                            facing_start=facing_start,
-                           gamma=gamma)
+                           gamma=gamma,
+                           gamma_skip_first_last=gamma_skip_first_last)
         kpf_size = os.path.getsize(kpf_path) / (1024 * 1024)
         print(f"    KPF: {kpf_size:.1f} MB")
 
@@ -434,6 +440,13 @@ def main() -> None:
              f"Use 1.0 to keep original image bytes untouched (default: {DEFAULT_GAMMA})",
     )
     parser.add_argument(
+        "--gamma-skip-first-last",
+        action="store_true",
+        help="Exclude the first and last page from gamma correction, so the "
+             "cover and back cover embed their original bytes while the "
+             "interior pages are still corrected",
+    )
+    parser.add_argument(
         "input_files",
         nargs="+",
         metavar="file",
@@ -460,7 +473,8 @@ def main() -> None:
         try:
             convert_to_kfx(input_file, args.output, args.direction,
                           args.virtual_panels, args.facing_pages,
-                          args.facing_start, args.gamma)
+                          args.facing_start, args.gamma,
+                          args.gamma_skip_first_last)
             success_count += 1
         except Exception as e:
             print(f"\nError processing {input_file}: {e}")

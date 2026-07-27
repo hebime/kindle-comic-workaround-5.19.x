@@ -953,7 +953,8 @@ def generate_kpf(image_paths: list[str], output_path: str, title: str = "",
                  language: str = "en-US", virtual_panels: str = "off",
                  facing_pages: bool = False,
                  facing_start: str = "single",
-                 gamma: float = DEFAULT_GAMMA) -> None:
+                 gamma: float = DEFAULT_GAMMA,
+                 gamma_skip_first_last: bool = False) -> None:
     """Generate a KPF file from a list of images.
 
     Args:
@@ -970,6 +971,8 @@ def generate_kpf(image_paths: list[str], output_path: str, title: str = "",
                       Only effective when facing_pages is True.
         gamma: Display-gamma compensation applied to every page image
                (see DEFAULT_GAMMA). 1.0 embeds the original bytes untouched.
+        gamma_skip_first_last: If True, the first and last page keep their original
+               bytes while every page in between is gamma-corrected.
     """
     if not image_paths:
         raise ValueError("At least one image is required")
@@ -980,7 +983,12 @@ def generate_kpf(image_paths: list[str], output_path: str, title: str = "",
         gamma_dir = tempfile.mkdtemp(prefix="kpf-gamma-")
         try:
             corrected_paths = []
+            last_idx = len(image_paths) - 1
             for idx, img_path in enumerate(image_paths):
+                if gamma_skip_first_last and idx in (0, last_idx):
+                    # Cover / back cover embed their original bytes.
+                    corrected_paths.append(img_path)
+                    continue
                 ext = ".jpg" if _detect_image_format(img_path) == "jpg" else ".png"
                 dst = os.path.join(gamma_dir, f"{idx + 1:04d}{ext}")
                 _gamma_correct_image(img_path, dst, gamma)
@@ -1512,6 +1520,9 @@ def main():
                              "matching Kindle Previewer / Send-to-Kindle). "
                              "1.0 keeps original image bytes untouched "
                              f"(default: {DEFAULT_GAMMA})")
+    parser.add_argument("--gamma-skip-first-last", action="store_true",
+                        help="Leave the first and last page uncorrected "
+                             "(cover / back cover keep their original bytes)")
     args = parser.parse_args()
 
     generate_kpf(
@@ -1525,6 +1536,7 @@ def main():
         facing_pages=args.facing_pages,
         facing_start=args.facing_start,
         gamma=args.gamma,
+        gamma_skip_first_last=args.gamma_skip_first_last,
     )
     print(f"KPF generated: {args.output}")
 

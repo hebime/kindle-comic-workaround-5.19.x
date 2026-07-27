@@ -107,6 +107,9 @@ python convert.py --virtual-panels horizontal manga.epub
 # Disable gamma correction (keep original image bytes) / 关闭伽马校正（保留原始图片字节）
 python convert.py --gamma 1.0 manga.epub
 
+# Skip the first and last page (cover / back cover stay untouched) / 跳过首末页（封面与封底保持原样）
+python convert.py --gamma-skip-first-last manga.epub
+
 # Multiple files / 批量转换
 python convert.py *.epub *.mobi *.pdf
 
